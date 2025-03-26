@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  apache-php:
+    image: ixemgod/php_wikipedia_scrapper:latest
+    container_name: apache-php
+    ports:
+      - "80:80"
+    volumes:
+      - ./src:/var/www/html
+    networks:
+      - app-network
+
+  mysql:
+    image: ixemgod/mysql_wikipedia_scrapper:latest
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: wikipedia
+      MYSQL_USER: user
+      MYSQL_PASSWORD: userpassword
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - app-network
+
+  phpmyadmin:
+    image: ixemgod/phpmyadmin_wikipedia_scrapper:latest
+    container_name: phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: user
+      PMA_PASSWORD: userpassword
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+
