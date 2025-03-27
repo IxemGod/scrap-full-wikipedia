@@ -81,22 +81,22 @@ def download_images(page_text, title, base_url):
             full_url = urljoin(base_url, src)  # Convert to absolute URL
             img_ext = full_url.split(".")[-1]  # Retrieve the image extension
             # Download the image file
-            if(full_url != "https://login.wikimedia.org/wiki/Special:CentralAutoLogin/start?useformat=desktop&type=1x1&usesul3=0" and os.path.exists(f"../assets/images/{title}_{nbr_img_file}.{img_ext}")):
+            if(full_url != "https://login.wikimedia.org/wiki/Special:CentralAutoLogin/start?useformat=desktop&type=1x1&usesul3=0" and not os.path.exists(f"src/assets/images/{title}_{nbr_img_file}.{img_ext}")):
                 response_img = requests.get(full_url, headers=headers)
                 if response_img.status_code == 200:
                     img_path = f"src/assets/images/{title}_{nbr_img_file}.{img_ext}"
                     with open(img_path, "wb+") as f:
                         f.write(response_img.content)
                     
-                    # Change the `src` attribute to point to the local file
-                    img["src"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
-                    img["srcset"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
+            # Change the `src` attribute to point to the local file
+            img["src"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
+            img["srcset"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
 
-                    wiki_file_name = full_url.split("/")[-2]
-                    # Edit all links that point to "wiki/File:..."
-                    for a_tag in soup.find_all("a", href=True):
-                        if f"wiki/Fichier:{wiki_file_name}" in a_tag["href"]:
-                            a_tag["href"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
+            wiki_file_name = full_url.split("/")[-2]
+            # Edit all links that point to "wiki/File:..."
+            for a_tag in soup.find_all("a", href=True):
+                if f"wiki/Fichier:{wiki_file_name}" in a_tag["href"]:
+                    a_tag["href"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
 
     # Rewrite the HTML page with the new image sources
     with open(f"src/page/{title}.html", "w+", encoding="utf-8") as f:
@@ -109,23 +109,23 @@ def download_videos(page_text, title, base_url):
     soup = BeautifulSoup(page_text, "html.parser")
     videos = soup.find_all("video")
 
-    os.makedirs("src/assets/videos", exist_ok=True)  # Créer le dossier si inexistant
+    os.makedirs("src/assets/videos", exist_ok=True)  # Create the folder if it does not exist
 
-    nbr_video_file = 0  # Compteur de vidéos
+    nbr_video_file = 0  # Video counter
 
     for video in videos:
         src = video.get("src")
         
         if not src:
-            # Vérifier si la vidéo a des sources `<source src="...">`
+            # Check if the video has sources `<source src="...">`
             source_tag = video.find("source")
             if source_tag:
                 src = source_tag.get("src")
 
         if src:
-            nbr_video_file += 1  # Incrémenter le compteur
-            full_url = urljoin(base_url, src)  # Convertir en URL absolue
-            video_ext = full_url.split(".")[-1].split("?")[0]  # Extraire extension propre
+            nbr_video_file += 1  # Increment the counter
+            full_url = urljoin(base_url, src)  # Convert to absolute URL
+            video_ext = full_url.split(".")[-1].split("?")[0]  # Extract clean extension
             video_path = f"src/assets/videos/{title}_{nbr_video_file}.{video_ext}"
 
             if not os.path.exists(video_path):
@@ -137,19 +137,21 @@ def download_videos(page_text, title, base_url):
                         for chunk in response_video.iter_content(chunk_size=8192):
                             f.write(chunk)
 
-                    # Modifier `src` dans `soup`
-                    if video.get("src"):
-                        video["src"] = f"../assets/videos/{title}_{nbr_video_file}.{video_ext}"
-                    
-                    # Mettre à jour toutes les sources `<source>` de la vidéo
-                    for source in video.find_all("source"):
-                        source["src"] = f"../assets/videos/{title}_{nbr_video_file}.{video_ext}"
+            # Modifier `src` dans `soup`
+            if video.get("src"):
+                video["src"] = f"../assets/videos/{title}_{nbr_video_file}.{video_ext}"
+            if video.get("poster"):
+                video["poster"] = "../static/poster-video.png"
+            
+            # Update all sources `<source>` of the video
+            for source in video.find_all("source"):
+                source["src"] = f"../assets/videos/{title}_{nbr_video_file}.{video_ext}"
 
-    # Réécrire la page HTML avec les nouvelles sources des vidéos
+    # Rewrite the HTML page with the new video sources
     with open(f"src/page/{title}.html", "w+", encoding="utf-8") as f:
         f.write(str(soup))
 
-    return str(soup)  # Retourner la version modifiée avec `soup`
+    return str(soup)  # Return the modified version with `soup`
 
 def get_single_page(title, base_url, url):
     global headers
@@ -181,6 +183,7 @@ os.makedirs(f"src/assets/images", exist_ok=True)
 os.makedirs(f"src/assets/videos", exist_ok=True)
 os.makedirs(f"src/css", exist_ok=True)
 os.makedirs(f"src/page", exist_ok=True)
+os.makedirs(f"src/static", exist_ok=True)
 
 # Wikipedia page do downloads
 # title = "Python_(langage)"
