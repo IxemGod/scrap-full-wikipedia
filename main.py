@@ -153,6 +153,52 @@ def download_videos(page_text, title, base_url):
 
     return str(soup)  # Return the modified version with `soup`
 
+def download_audio(page_text, title, base_url):
+    global headers
+    soup = BeautifulSoup(page_text, "html.parser")
+    audios = soup.find_all("audio")
+
+    os.makedirs("src/assets/audio", exist_ok=True)  # Create the folder if it does not exist
+
+    nbr_audio_file = 0  # Audio file counter
+
+    for audio in audios:
+        src = audio.get("src")
+        
+        if not src:
+            # Check if the audio has <source> tags
+            source_tag = audio.find("source")
+            if source_tag:
+                src = source_tag.get("src")
+
+        if src:
+            nbr_audio_file += 1  # Increment the counter
+            full_url = urljoin(base_url, src)  # Convert to absolute URL
+            audio_ext = full_url.split(".")[-1].split("?")[0]  # Extract the clean extension
+            audio_path = f"src/assets/audio/{title}_{nbr_audio_file}.{audio_ext}"
+
+            if not os.path.exists(audio_path):
+                response_audio = requests.get(full_url, headers=headers, stream=True)
+
+                if response_audio.status_code == 200:
+                    with open(audio_path, "wb") as f:
+                        for chunk in response_audio.iter_content(chunk_size=8192):
+                            f.write(chunk)
+
+            # Edit `src` in `soup`
+            if audio.get("src"):
+                audio["src"] = f"../assets/audio/{title}_{nbr_audio_file}.{audio_ext}"
+            
+            # Update all `<source>` of the audio
+            for source in audio.find_all("source"):
+                source["src"] = f"../assets/audio/{title}_{nbr_audio_file}.{audio_ext}"
+
+    # Rewrite the HTML page with the new audio file paths
+    with open(f"src/page/{title}.html", "w+", encoding="utf-8") as f:
+        f.write(str(soup))
+
+    return str(soup)  # Returns the modified version with `soup`
+
 def get_single_page(title, base_url, url):
     global headers
 
@@ -171,6 +217,7 @@ def get_single_page(title, base_url, url):
 
         resultat_video = download_videos(resultat_images, title, base_url)
 
+        resultat_audio = download_audio(resultat_video, title, base_url)
 
         print("Extract complete.")
 
@@ -181,6 +228,7 @@ def get_single_page(title, base_url, url):
 os.makedirs(f"src", exist_ok=True)
 os.makedirs(f"src/assets/images", exist_ok=True)
 os.makedirs(f"src/assets/videos", exist_ok=True)
+os.makedirs(f"src/assets/audio", exist_ok=True)
 os.makedirs(f"src/css", exist_ok=True)
 os.makedirs(f"src/page", exist_ok=True)
 os.makedirs(f"src/static", exist_ok=True)
