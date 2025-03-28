@@ -1,12 +1,13 @@
 import requests
 from bs4 import BeautifulSoup, Comment
-from urllib.parse import urljoin
+from urllib.parse import urljoin, unquote
 import cssutils
 import logging
 import os
 
 # Desactivate warnings of cssutils
 cssutils.log.setLevel(logging.CRITICAL)
+
 
 def part_clean(content):
     global class_list_to_delete, id_list_to_delete
@@ -66,39 +67,48 @@ def download_style(page_text, title, base_url):
 
 def download_images(page_text, title, base_url):
     global headers
-    # Parse html with BeautifulSoup
+    # Parse HTML with BeautifulSoup
     soup = BeautifulSoup(page_text, "html.parser")
-    # Find all img
-    images = soup.find_all("img")
-    # Set a number that will be increment to the number of styles files
-    nbr_img_file = 0
-    # Extrat and print the complete urls
-    for img in images:
-        src = img.get("src")
-        if src:
-            # On incrémente de 1
-            nbr_img_file = nbr_img_file + 1
-            full_url = urljoin(base_url, src)  # Convert to absolute URL
-            img_ext = full_url.split(".")[-1]  # Retrieve the image extension
-            # Download the image file
-            if(full_url != "https://login.wikimedia.org/wiki/Special:CentralAutoLogin/start?useformat=desktop&type=1x1&usesul3=0" and not os.path.exists(f"src/assets/images/{title}_{nbr_img_file}.{img_ext}")):
-                response_img = requests.get(full_url, headers=headers)
-                if response_img.status_code == 200:
-                    img_path = f"src/assets/images/{title}_{nbr_img_file}.{img_ext}"
-                    with open(img_path, "wb+") as f:
-                        f.write(response_img.content)
-                    
-            # Change the `src` attribute to point to the local file
-            img["src"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
-            img["srcset"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
 
-            wiki_file_name = full_url.split("/")[-2]
-            # Edit all links that point to "wiki/File:..."
-            for a_tag in soup.find_all("a", href=True):
-                if f"wiki/Fichier:{wiki_file_name}" in a_tag["href"]:
-                    a_tag["href"] = f"../assets/images/{title}_{nbr_img_file}.{img_ext}"
+    # Find all images in <a> tags
+    nbr_img_file = 0  # Counter for files
+    image_links_map = {}  # Dictionary to store correspondences { filename : localpath }
 
-    # Rewrite the HTML page with the new image sources
+    for a_tag in soup.find_all("a", href=True):
+        img = a_tag.find("img")  # Checks if the <a> contains an image
+        if img:
+            src = img.get("src")
+            if src:
+                # Incrementing the counter
+                nbr_img_file += 1
+                full_url = urljoin(base_url, src)  # Absolute URL of the image
+                img_ext = os.path.splitext(full_url)[-1]  # Image extension
+
+                # Extract file name from image
+                img_filename = unquote(full_url.split("/")[-1])  # Decode the %20
+
+                img_path = f"src/assets/images/{title}_{nbr_img_file}{img_ext}"
+                img_path_href = f"../assets/images/{title}_{nbr_img_file}{img_ext}"
+
+                # Download the image if it doesn't exist yet
+                if (full_url != "https://login.wikimedia.org/wiki/Special:CentralAutoLogin/start?useformat=desktop&type=1x1&usesul3=0"
+                        and not os.path.exists(img_path)):
+                    response_img = requests.get(full_url, headers=headers)
+                    if response_img.status_code == 200:
+                        with open(img_path, "wb+") as f:
+                            f.write(response_img.content)
+
+                # Change the image to point to the local file
+                img["src"] = img_path_href
+                img["srcset"] = img_path_href
+
+                # Associate the file with the correct local path
+                image_links_map[img_filename] = img_path_href
+
+                # Change the `href` attribute of the <a> to point to the local image
+                a_tag["href"] = img_path_href
+
+    # Rewrite the HTML file with the changes
     with open(f"src/page/{title}.html", "w+", encoding="utf-8") as f:
         f.write(str(soup))
 
@@ -234,8 +244,8 @@ os.makedirs(f"src/page", exist_ok=True)
 os.makedirs(f"src/static", exist_ok=True)
 
 # Wikipedia page do downloads
-# title = "Python_(langage)"
-title = "Apollo_11"
+title = "Python_(langage)"
+# title = "Apollo_11"
 base_url = "https://fr.wikipedia.org"
 url = f"{base_url}/wiki/{title}"
 headers = {"User-Agent": "Mozilla/5.0"}
