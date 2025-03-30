@@ -22,21 +22,39 @@ mydb = mysql.connector.connect(
   host="localhost",
   user="user",
   password="userpassword",
-  database="wikipedia"
+  database="wikipedia",
+  charset="utf8mb4"
 )
 
 # Check if table exist
-mycursor = mydb.cursor()
+mycursor = mydb.cursor(buffered=True)
 mycursor.execute("SHOW TABLES LIKE 'url_to_scrap'")
-result = mycursor.fetchone()
-if not result:
+result1 = mycursor.fetchone()
+
+mycursor.execute("SHOW TABLES LIKE 'url_aldrealy_scrap'")
+result2 = mycursor.fetchone()
+if not result1:
     # create table link_to_scrap with id, title, url
-    mycursor.execute("CREATE TABLE url_to_scrap (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255), url VARCHAR(255))")
+    mycursor.execute("""
+    CREATE TABLE url_to_scrap (
+        id INT AUTO_INCREMENT PRIMARY KEY, 
+        title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci, 
+        url VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+    """)
     # Insert a link to scrap
     mycursor.execute("INSERT INTO url_to_scrap (title, url) VALUES ('Python_(langage)', 'https://fr.wikipedia.org/wiki/Python_(langage)')")
+
+if not result2:
+    mycursor.execute("""
+    CREATE TABLE url_aldrealy_scrap (
+        id INT AUTO_INCREMENT PRIMARY KEY, 
+        title VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci, 
+        url VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+    """)
     
     mydb.commit()
-    print("Database created.")
 
 
 
@@ -240,6 +258,49 @@ def download_audio(page_text, title, base_url):
 
     return str(soup)  # Returns the modified version with `soup`
 
+def insert_wiki_link(page_text, title, base_url):
+    # Analyse du HTML avec BeautifulSoup
+    soup = BeautifulSoup(page_text, "html.parser")
+
+    # Retrieve all links with a title attribute
+    links = soup.find_all("a", title=True)
+
+    for link in links:
+        original_href = link.get("href")
+        title_href = link.get("title")
+
+        if original_href and title_href:
+            # Transform url
+            if original_href.startswith("/wiki/") and ":" not in original_href:
+                slug_page = unquote(original_href.split("/")[-1])  # Retrieve the page slug
+                new_url = f"http://wiki.ixem/page/{slug_page}.html"
+                old_url = f"{base_url}/wiki/{slug_page}"
+
+                # Check if the URL already exists in url_to_scrap
+                mycursor.execute("SELECT * FROM url_to_scrap WHERE url = %s", (old_url,))
+                result_request1 = mycursor.fetchone()
+                if not result_request1:
+                     # Check if the URL already exists in url_aldrealy_scrap
+                        mycursor.execute("SELECT * FROM url_aldrealy_scrap WHERE url = %s", (old_url,))
+                        result_request2 = mycursor.fetchone()
+                        if not result_request2:
+                            # Insertion into database
+                            sql = "INSERT INTO url_to_scrap (title, url) VALUES (%s, %s)"
+                            values = (title_href, old_url)
+                            mycursor.execute(sql, values)
+                            mydb.commit()
+
+
+                # change the href of the link
+                link["href"] = new_url
+
+    
+    # Rewrite the HTML page with the new audio file paths
+    with open(f"src/page/{title}.html", "w+", encoding="utf-8") as f:
+        f.write(str(soup))
+
+    return str(soup)  # Returns the modified version with `soup`
+
 def get_single_page(title, base_url, url):
     global headers
 
@@ -260,7 +321,7 @@ def get_single_page(title, base_url, url):
 
         resultat_audio = download_audio(resultat_video, title, base_url)
 
-        print("Extract complete.")
+        resultat_add_link = insert_wiki_link(resultat_audio, title, base_url)
 
     else:
         print(f"Error {response.status_code}")
@@ -289,14 +350,11 @@ while True:
     title = url.split("/")[-1]  # Extract the last part of the URL
 
     # Call the function to download the page
-    get_single_page(title, base_url, url)
+    get_single_page(title, base_url, url)    # Delete the row from the database
+    mycursor.execute(f"DELETE FROM url_to_scrap WHERE id = {myresult[0]}")
+    mycursor.execute("INSERT INTO url_aldrealy_scrap (title, url) VALUES (%s, %s)", (titleh1, url))
 
-    print(f"Page {title} downloaded.")
-    # Delete the row from the database
-    # mycursor.execute(f"DELETE FROM url_to_scrap WHERE id = {myresult[0]}")
-    # mydb.commit()
-    print(f"Page {title} deleted from database.")
-    test = input("")
+    mydb.commit()
 
 
     
