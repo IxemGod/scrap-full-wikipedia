@@ -4,9 +4,40 @@ from urllib.parse import urljoin, unquote
 import cssutils
 import logging
 import os
+import mysql.connector
 
 # Desactivate warnings of cssutils
 cssutils.log.setLevel(logging.CRITICAL)
+
+# Wikipedia page do downloads
+# title = "Python_(langage)"
+base_url = "https://fr.wikipedia.org"
+headers = {"User-Agent": "Mozilla/5.0"}
+class_list_to_delete = ["vector-header-container", "vector-sitenotice-container", 
+"vector-column-start", "vector-page-toolbar", "bandeau-article", "mw-editsection", "bandeau-section", "navigation-only"]
+id_list_to_delete = ["footer-info-copyright", "footer-icons", "footer-places", "p-lang-btn"]
+
+
+mydb = mysql.connector.connect(
+  host="localhost",
+  user="user",
+  password="userpassword",
+  database="wikipedia"
+)
+
+# Check if table exist
+mycursor = mydb.cursor()
+mycursor.execute("SHOW TABLES LIKE 'url_to_scrap'")
+result = mycursor.fetchone()
+if not result:
+    # create table link_to_scrap with id, title, url
+    mycursor.execute("CREATE TABLE url_to_scrap (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255), url VARCHAR(255))")
+    # Insert a link to scrap
+    mycursor.execute("INSERT INTO url_to_scrap (title, url) VALUES ('Python_(langage)', 'https://fr.wikipedia.org/wiki/Python_(langage)')")
+    
+    mydb.commit()
+    print("Database created.")
+
 
 
 def part_clean(content):
@@ -243,14 +274,30 @@ os.makedirs(f"src/css", exist_ok=True)
 os.makedirs(f"src/page", exist_ok=True)
 os.makedirs(f"src/static", exist_ok=True)
 
-# Wikipedia page do downloads
-title = "Python_(langage)"
-# title = "Apollo_11"
-base_url = "https://fr.wikipedia.org"
-url = f"{base_url}/wiki/{title}"
-headers = {"User-Agent": "Mozilla/5.0"}
-class_list_to_delete = ["vector-header-container", "vector-sitenotice-container", 
-"vector-column-start", "vector-page-toolbar", "bandeau-article", "mw-editsection", "bandeau-section", "navigation-only"]
-id_list_to_delete = ["footer-info-copyright", "footer-icons", "footer-places", "p-lang-btn"]
+while True:
+    mycursor.execute("SELECT * FROM url_to_scrap LIMIT 1")
 
-get_single_page(title, base_url, url)
+    # If there are no rows, break the loop
+    myresult = mycursor.fetchone()
+
+    if not myresult:
+        print("No more pages to download.")
+        break
+
+    titleh1 = myresult[1]
+    url = myresult[2]
+    title = url.split("/")[-1]  # Extract the last part of the URL
+
+    # Call the function to download the page
+    get_single_page(title, base_url, url)
+
+    print(f"Page {title} downloaded.")
+    # Delete the row from the database
+    # mycursor.execute(f"DELETE FROM url_to_scrap WHERE id = {myresult[0]}")
+    # mydb.commit()
+    print(f"Page {title} deleted from database.")
+    test = input("")
+
+
+    
+

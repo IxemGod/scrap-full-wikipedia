@@ -23,6 +23,8 @@ services:
       - mysql-data:/var/lib/mysql
     networks:
       - app-network
+    ports:
+    - "3306:3306"
 
   phpmyadmin:
     image: ixemgod/phpmyadmin_wikipedia_scrapper:latest
