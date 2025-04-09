@@ -19,7 +19,8 @@ id_list_to_delete = ["footer-info-copyright", "footer-icons", "footer-places", "
 
 
 mydb = mysql.connector.connect(
-  host="localhost",
+  host="127.0.0.1",
+  port=3307,
   user="user",
   password="userpassword",
   database="wikipedia",
@@ -328,6 +329,7 @@ def get_single_page(title, base_url, url):
 
 #Create folders if no exists
 os.makedirs(f"src", exist_ok=True)
+os.makedirs(f"src/assets/", exist_ok=True)
 os.makedirs(f"src/assets/images", exist_ok=True)
 os.makedirs(f"src/assets/videos", exist_ok=True)
 os.makedirs(f"src/assets/audio", exist_ok=True)

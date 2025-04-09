@@ -1,11 +1,12 @@
-version: '3.8'
-
 services:
   apache-php:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ixemgod/php_wikipedia_scrapper:latest
     container_name: apache-php
     ports:
-      - "80:80"
+      - "8082:80"  # Port modifié pour éviter les conflits avec un Apache local
     volumes:
       - ./src:/var/www/html
     networks:
@@ -24,13 +25,13 @@ services:
     networks:
       - app-network
     ports:
-    - "3306:3306"
+      - "3307:3306"  # Port modifié
 
   phpmyadmin:
     image: ixemgod/phpmyadmin_wikipedia_scrapper:latest
     container_name: phpmyadmin
     ports:
-      - "8080:80"
+      - "9090:80"  # Port modifié
     environment:
       PMA_HOST: mysql
       PMA_USER: user
@@ -40,8 +41,8 @@ services:
 
 networks:
   app-network:
+    name: wikipedia-scrapper_app-network
     driver: bridge
 
 volumes:
   mysql-data:
-
